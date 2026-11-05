@@ -26,7 +26,10 @@ export function devRouter(ctx: AppContext): Router {
       const uri = buildOtpauthUri(ctx.config.demoUser.email, ctx.config.totpSecret);
       const qr = await QRCode.toDataURL(uri, { errorCorrectionLevel: 'M', margin: 1, width: 480 });
       log('ENROLL', 'página de enrolamiento servida (solo desarrollo)');
-      res.set('Cache-Control', 'no-store').type('html').send(enrollPage(qr, normalizeBase32(ctx.config.totpSecret), uri));
+      res
+        .set('Cache-Control', 'no-store')
+        .type('html')
+        .send(enrollPage(qr, normalizeBase32(ctx.config.totpSecret), uri));
     });
   }
 

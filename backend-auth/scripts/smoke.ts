@@ -57,8 +57,14 @@ async function main(): Promise<void> {
 
   // 2. Login en el "navegador" sin seguir el redirect
   const form = new URLSearchParams({
-    response_type: 'code', client_id: config.clientId, redirect_uri: REDIRECT_URI, code_challenge: challenge,
-    code_challenge_method: 'S256', state, email: config.demoUser.email, password: config.demoUser.password,
+    response_type: 'code',
+    client_id: config.clientId,
+    redirect_uri: REDIRECT_URI,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state,
+    email: config.demoUser.email,
+    password: config.demoUser.password,
   });
   const authorize = await fetch(`${BASE_URL}/oauth/authorize`, { method: 'POST', body: form, redirect: 'manual' });
   expectStatus(authorize, 302, 'POST /oauth/authorize');
@@ -70,7 +76,11 @@ async function main(): Promise<void> {
 
   // 3. Canje con code_verifier
   const tokenRes = await post('/auth/oauth/token', {
-    grant_type: 'authorization_code', code: query.code, code_verifier: verifier, client_id: config.clientId, redirect_uri: REDIRECT_URI,
+    grant_type: 'authorization_code',
+    code: query.code,
+    code_verifier: verifier,
+    client_id: config.clientId,
+    redirect_uri: REDIRECT_URI,
   });
   expectStatus(tokenRes, 200, 'POST /auth/oauth/token');
   const tokens = await json<{ access_token: string; refresh_token: string }>(tokenRes);

@@ -7,8 +7,7 @@ interface RefreshRecord {
 }
 
 export type RefreshValidation =
-  | { readonly ok: true; readonly userId: string }
-  | { readonly ok: false; readonly reason: 'unknown' | 'expired' | 'revoked' };
+  { readonly ok: true; readonly userId: string } | { readonly ok: false; readonly reason: 'unknown' | 'expired' | 'revoked' };
 
 /** SHA-256 del token: si se filtrara la memoria del servidor, los hashes no sirven para autenticarse. */
 function hashToken(token: string): string {

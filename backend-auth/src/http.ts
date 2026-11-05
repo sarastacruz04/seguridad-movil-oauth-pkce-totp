@@ -39,12 +39,7 @@ export function readBearer(req: Request, ctx: AppContext): BearerResult {
  * Autentica la petición y exige uno de los tipos de token permitidos. Responde 401 si no cumple
  * (con WWW-Authenticate, RFC 6750) y devuelve undefined. Un step_up_token nunca pasa este filtro.
  */
-export function authenticate(
-  req: Request,
-  res: Response,
-  ctx: AppContext,
-  allowed: readonly TokenType[],
-): JwtClaims | undefined {
+export function authenticate(req: Request, res: Response, ctx: AppContext, allowed: readonly TokenType[]): JwtClaims | undefined {
   const result = readBearer(req, ctx);
   if (!result.ok) {
     res.set('WWW-Authenticate', `Bearer error="invalid_token"`);

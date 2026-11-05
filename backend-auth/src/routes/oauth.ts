@@ -53,7 +53,10 @@ export function oauthRouter(ctx: AppContext): Router {
     const validUser = email === config.demoUser.email && safeEqual(password, config.demoUser.password);
     if (!validUser) {
       log('OAUTH', `credenciales incorrectas para "${email}"`);
-      res.status(401).type('html').send(loginPage(params, { email, error: 'Correo o contraseña incorrectos.' }));
+      res
+        .status(401)
+        .type('html')
+        .send(loginPage(params, { email, error: 'Correo o contraseña incorrectos.' }));
       return;
     }
 

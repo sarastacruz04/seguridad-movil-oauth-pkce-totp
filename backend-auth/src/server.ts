@@ -29,5 +29,8 @@ app.listen(config.port, config.host, () => {
   }
   if (config.devEnrollPage) log('SERVER', `Enrolamiento (solo dev): http://<IP>:${config.port}/mfa/enroll`);
   if (config.jwtSecretIsEphemeral) log('SERVER', 'JWT_SECRET vacío: se generó uno aleatorio (los tokens no sobreviven a un reinicio).');
-  log('SERVER', `TTLs → access ${config.accessTtlSeconds}s · step-up ${config.stepUpTtlSeconds}s · elevated ${config.elevatedTtlSeconds}s · replay ${config.replayTtlSeconds}s`);
+  log(
+    'SERVER',
+    `TTLs → access ${config.accessTtlSeconds}s · step-up ${config.stepUpTtlSeconds}s · elevated ${config.elevatedTtlSeconds}s · replay ${config.replayTtlSeconds}s`,
+  );
 });

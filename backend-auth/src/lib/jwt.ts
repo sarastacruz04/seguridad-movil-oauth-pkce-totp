@@ -19,9 +19,7 @@ export interface JwtClaims {
 
 export type JwtFailureReason = 'malformed' | 'bad_signature' | 'expired';
 
-export type JwtVerification =
-  | { readonly ok: true; readonly claims: JwtClaims }
-  | { readonly ok: false; readonly reason: JwtFailureReason };
+export type JwtVerification = { readonly ok: true; readonly claims: JwtClaims } | { readonly ok: false; readonly reason: JwtFailureReason };
 
 const HEADER = { alg: 'HS256', typ: 'JWT' } as const;
 const ENCODED_HEADER = Buffer.from(JSON.stringify(HEADER)).toString('base64url');

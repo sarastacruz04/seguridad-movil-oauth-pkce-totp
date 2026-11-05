@@ -17,9 +17,7 @@ export function sessionRouter(ctx: AppContext): Router {
   router.post('/auth/refresh', (req, res) => {
     noStore(res);
     const refreshToken = bodyString(req, 'refresh_token');
-    const validation = refreshToken
-      ? ctx.refreshTokens.validate(refreshToken, ctx.clock())
-      : ({ ok: false, reason: 'unknown' } as const);
+    const validation = refreshToken ? ctx.refreshTokens.validate(refreshToken, ctx.clock()) : ({ ok: false, reason: 'unknown' } as const);
     if (!validation.ok) {
       log('REFRESH', `rechazado (${validation.reason})`);
       sendError(res, 401, 'invalid_grant', 'refresh_token inválido, vencido o revocado. Inicia sesión de nuevo.');

@@ -90,7 +90,9 @@ describe('JWT HS256 hecho a mano', () => {
   it('rechaza expirado, firma alterada, otra clave y alg "none"', () => {
     assert.deepEqual(verifyJwt(token, secret, 1060), { ok: false, reason: 'expired' });
     const [h, p] = token.split('.');
-    const forgedPayload = Buffer.from(JSON.stringify({ sub: 'u1', iat: 1000, exp: 9999, typ: 'elevated', mfa_verified: true, jti: 'x' })).toString('base64url');
+    const forgedPayload = Buffer.from(
+      JSON.stringify({ sub: 'u1', iat: 1000, exp: 9999, typ: 'elevated', mfa_verified: true, jti: 'x' }),
+    ).toString('base64url');
     assert.deepEqual(verifyJwt(`${h}.${forgedPayload}.${token.split('.')[2]}`, secret, 1001), { ok: false, reason: 'bad_signature' });
     assert.deepEqual(verifyJwt(token, 'otra-clave', 1001), { ok: false, reason: 'bad_signature' });
     const none = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');

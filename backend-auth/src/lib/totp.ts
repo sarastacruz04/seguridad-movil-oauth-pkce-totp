@@ -34,10 +34,7 @@ export function dynamicTruncate(hmac: Uint8Array): string {
   const offset = hmac[19]! & 0x0f;
   // 2. Se toman 4 bytes desde offset; el primero se enmascara con 0x7f para descartar el bit de signo.
   const binCode =
-    ((hmac[offset]! & 0x7f) << 24) |
-    ((hmac[offset + 1]! & 0xff) << 16) |
-    ((hmac[offset + 2]! & 0xff) << 8) |
-    (hmac[offset + 3]! & 0xff);
+    ((hmac[offset]! & 0x7f) << 24) | ((hmac[offset + 1]! & 0xff) << 16) | ((hmac[offset + 2]! & 0xff) << 8) | (hmac[offset + 3]! & 0xff);
   // 3. Se reduce a 6 dígitos y se rellena con ceros a la izquierda (054231).
   return String(binCode % MODULO).padStart(TOTP_DIGITS, '0');
 }
@@ -52,8 +49,7 @@ export function totp(key: Uint8Array, unixSeconds: number): string {
 }
 
 export type TotpVerification =
-  | { readonly valid: true; readonly matchedStep: number; readonly drift: -1 | 0 | 1 }
-  | { readonly valid: false };
+  { readonly valid: true; readonly matchedStep: number; readonly drift: -1 | 0 | 1 } | { readonly valid: false };
 
 const DRIFTS = [-1, 0, 1] as const;
 

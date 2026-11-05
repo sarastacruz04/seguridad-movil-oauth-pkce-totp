@@ -48,7 +48,10 @@ describe('HMAC manual', () => {
       const key = new Uint8Array(randomBytes(keyLength));
       const message = new Uint8Array(randomBytes(37));
       assert.equal(bytesToHex(await hmac(nodeCryptoProvider.sha1, key, message)), createHmac('sha1', key).update(message).digest('hex'));
-      assert.equal(bytesToHex(await hmac(nodeCryptoProvider.sha256, key, message)), createHmac('sha256', key).update(message).digest('hex'));
+      assert.equal(
+        bytesToHex(await hmac(nodeCryptoProvider.sha256, key, message)),
+        createHmac('sha256', key).update(message).digest('hex'),
+      );
     }
   });
 });
@@ -98,10 +101,11 @@ describe('Base32', () => {
 
 describe('Parser otpauth://', () => {
   it('lee el ejemplo de la guía', () => {
-    assert.deepEqual(
-      parseOtpauthUri('otpauth://totp/UniSabana:estudiante@unisabana.edu.co?secret=JBSWY3DPEHPK3PXP&issuer=UniSabana'),
-      { secret: 'JBSWY3DPEHPK3PXP', issuer: 'UniSabana', accountName: 'estudiante@unisabana.edu.co' },
-    );
+    assert.deepEqual(parseOtpauthUri('otpauth://totp/UniSabana:estudiante@unisabana.edu.co?secret=JBSWY3DPEHPK3PXP&issuer=UniSabana'), {
+      secret: 'JBSWY3DPEHPK3PXP',
+      issuer: 'UniSabana',
+      accountName: 'estudiante@unisabana.edu.co',
+    });
   });
   it('decodifica percent-encoding y toma el issuer del prefijo si falta el parámetro', () => {
     assert.deepEqual(parseOtpauthUri('otpauth://totp/Uni%20Sabana%3Aana%40x.co?secret=jbswy3dpehpk3pxp'), {

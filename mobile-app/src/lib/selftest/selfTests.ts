@@ -37,9 +37,7 @@ export async function runHmacSelfTest(crypto: CryptoProvider): Promise<SelfTestS
   const key = new Uint8Array(20).fill(0x0b);
   const actual = bytesToHex(await hmac(crypto.sha1, key, utf8ToBytes('Hi There')));
   const longKey = new Uint8Array(80).fill(0xaa); // caso 6: clave > 64 bytes (se hashea primero)
-  const actualLong = bytesToHex(
-    await hmac(crypto.sha1, longKey, utf8ToBytes('Test Using Larger Than Block-Size Key - Hash Key First')),
-  );
+  const actualLong = bytesToHex(await hmac(crypto.sha1, longKey, utf8ToBytes('Test Using Larger Than Block-Size Key - Hash Key First')));
   return suite('rfc2202', 'RFC 2202 · HMAC-SHA1', [
     check('Caso 1: clave 0x0b×20, "Hi There"', 'b617318655057264e28bc0b6fb378c8ef146be00', actual),
     check('Caso 6: clave 0xaa×80 (> bloque)', 'aa4ae5e15272d00e95705637ce8a3b55ed402112', actualLong),
@@ -59,7 +57,7 @@ export async function runHotpSelfTest(crypto: CryptoProvider): Promise<SelfTestS
 export async function runTotpSelfTest(crypto: CryptoProvider): Promise<SelfTestSuite> {
   const engine = createTotpEngine(crypto.sha1);
   const key = utf8ToBytes(RFC_SECRET);
-  const vectors: ReadonlyArray<readonly [number, string]> = [
+  const vectors: readonly (readonly [number, string])[] = [
     [59, '287082'],
     [1111111109, '081804'],
     [1111111111, '050471'],
@@ -67,9 +65,7 @@ export async function runTotpSelfTest(crypto: CryptoProvider): Promise<SelfTestS
     [2000000000, '279037'],
     [20000000000, '353130'],
   ];
-  const cases = await Promise.all(
-    vectors.map(async ([t, code]) => check(`t = ${t}`, code, await engine.generateTotpFromKey(key, t))),
-  );
+  const cases = await Promise.all(vectors.map(async ([t, code]) => check(`t = ${t}`, code, await engine.generateTotpFromKey(key, t))));
   return suite('rfc6238', 'RFC 6238 · TOTP SHA-1', cases);
 }
 

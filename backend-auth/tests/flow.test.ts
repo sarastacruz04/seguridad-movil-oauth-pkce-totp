@@ -39,7 +39,13 @@ async function stepUpToken(accessToken: string): Promise<string> {
 }
 
 describe('GET /oauth/authorize', () => {
-  const base = { response_type: 'code', client_id: 'unisabana-mobile', redirect_uri: REDIRECT_URI, state: 'estado-aleatorio-123456', code_challenge_method: 'S256' };
+  const base = {
+    response_type: 'code',
+    client_id: 'unisabana-mobile',
+    redirect_uri: REDIRECT_URI,
+    state: 'estado-aleatorio-123456',
+    code_challenge_method: 'S256',
+  };
 
   it('muestra el formulario con parámetros válidos', async () => {
     const qs = new URLSearchParams({ ...base, code_challenge: createPkcePair().challenge });
@@ -64,10 +70,19 @@ describe('GET /oauth/authorize', () => {
 
   it('acepta redirect_uri de Expo Go (exp://) y conserva su query', async () => {
     const { challenge } = createPkcePair();
-    const form = new URLSearchParams({ ...base, redirect_uri: 'exp://192.168.1.5:8081/--/callback?x=1', code_challenge: challenge, email: 'estudiante@unisabana.edu.co', password: 'clave-de-prueba' });
+    const form = new URLSearchParams({
+      ...base,
+      redirect_uri: 'exp://192.168.1.5:8081/--/callback?x=1',
+      code_challenge: challenge,
+      email: 'estudiante@unisabana.edu.co',
+      password: 'clave-de-prueba',
+    });
     const res = await fetch(`${server.baseUrl}/oauth/authorize`, { method: 'POST', body: form, redirect: 'manual' });
     assert.equal(res.status, 302);
-    assert.match(res.headers.get('location') ?? '', /^exp:\/\/192\.168\.1\.5:8081\/--\/callback\?x=1&code=[\w-]+&state=estado-aleatorio-123456$/);
+    assert.match(
+      res.headers.get('location') ?? '',
+      /^exp:\/\/192\.168\.1\.5:8081\/--\/callback\?x=1&code=[\w-]+&state=estado-aleatorio-123456$/,
+    );
   });
 });
 
@@ -87,7 +102,11 @@ describe('Canje del code (POST /auth/oauth/token)', () => {
 
     const exchange = (codeVerifier: string) =>
       postJson(server.baseUrl, '/auth/oauth/token', {
-        grant_type: 'authorization_code', code: query.code, code_verifier: codeVerifier, client_id: 'unisabana-mobile', redirect_uri: REDIRECT_URI,
+        grant_type: 'authorization_code',
+        code: query.code,
+        code_verifier: codeVerifier,
+        client_id: 'unisabana-mobile',
+        redirect_uri: REDIRECT_URI,
       });
     const wrong = await exchange(createPkcePair().verifier);
     assert.equal(wrong.status, 400);
@@ -100,7 +119,13 @@ describe('Canje del code (POST /auth/oauth/token)', () => {
   it('el code es de un solo uso', async () => {
     const { verifier, challenge } = createPkcePair();
     const { location } = await authorize(server.baseUrl, challenge, randomBytes(16).toString('base64url'));
-    const body = { grant_type: 'authorization_code', code: readQuery(location ?? '').code, code_verifier: verifier, client_id: 'unisabana-mobile', redirect_uri: REDIRECT_URI };
+    const body = {
+      grant_type: 'authorization_code',
+      code: readQuery(location ?? '').code,
+      code_verifier: verifier,
+      client_id: 'unisabana-mobile',
+      redirect_uri: REDIRECT_URI,
+    };
     const first = await postJson(server.baseUrl, '/auth/oauth/token', body);
     assert.equal(first.status, 200);
     assert.equal(first.headers.get('cache-control'), 'no-store');
@@ -112,7 +137,11 @@ describe('Canje del code (POST /auth/oauth/token)', () => {
     const { verifier, challenge } = createPkcePair();
     const { location } = await authorize(server.baseUrl, challenge, randomBytes(16).toString('base64url'));
     const res = await postJson(server.baseUrl, '/auth/oauth/token', {
-      grant_type: 'authorization_code', code: readQuery(location ?? '').code, code_verifier: verifier, client_id: 'unisabana-mobile', redirect_uri: 'unisabana-auth://otra',
+      grant_type: 'authorization_code',
+      code: readQuery(location ?? '').code,
+      code_verifier: verifier,
+      client_id: 'unisabana-mobile',
+      redirect_uri: 'unisabana-auth://otra',
     });
     assert.equal(res.status, 400);
   });
@@ -122,7 +151,11 @@ describe('Canje del code (POST /auth/oauth/token)', () => {
     const { location } = await authorize(server.baseUrl, challenge, randomBytes(16).toString('base64url'));
     server.advance(61);
     const res = await postJson(server.baseUrl, '/auth/oauth/token', {
-      grant_type: 'authorization_code', code: readQuery(location ?? '').code, code_verifier: verifier, client_id: 'unisabana-mobile', redirect_uri: REDIRECT_URI,
+      grant_type: 'authorization_code',
+      code: readQuery(location ?? '').code,
+      code_verifier: verifier,
+      client_id: 'unisabana-mobile',
+      redirect_uri: REDIRECT_URI,
     });
     assert.equal(res.status, 400);
   });
@@ -205,7 +238,7 @@ describe('Step-up + anti-replay', () => {
     // Pasados 90 s el código ya no está en el caché, pero también salió de las ventanas válidas → 400, no 409.
     const later = await postJson(server.baseUrl, '/auth/mfa/verify', { step_up_token: stepUp, code });
     assert.equal(later.status, 400);
-    assert.equal(server.ctx.replayCache.has(`usr_estudiante_001:${code}`, (server.nowSeconds()) * 1000), false);
+    assert.equal(server.ctx.replayCache.has(`usr_estudiante_001:${code}`, server.nowSeconds() * 1000), false);
   });
 
   it('5 fallos en un minuto → 429', async () => {

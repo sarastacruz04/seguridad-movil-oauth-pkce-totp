@@ -40,11 +40,7 @@ export function dynamicTruncate(hmacResult: Uint8Array): string {
   const offset = H[19] & 0x0f;
   // 2. Se leen 4 bytes desde offset. "& 0x7F" en el primero apaga el bit más alto para que el
   //    entero de 31 bits sea siempre positivo (evita diferencias entre aritmética con/sin signo).
-  const binCode =
-    ((H[offset] & 0x7f) << 24) |
-    ((H[offset + 1] & 0xff) << 16) |
-    ((H[offset + 2] & 0xff) << 8) |
-    (H[offset + 3] & 0xff);
+  const binCode = ((H[offset] & 0x7f) << 24) | ((H[offset + 1] & 0xff) << 16) | ((H[offset + 2] & 0xff) << 8) | (H[offset + 3] & 0xff);
   // 3. Módulo 10^6 → 6 dígitos, con ceros a la izquierda (54231 → "054231").
   return String(binCode % 1_000_000).padStart(TOTP_DIGITS, '0');
 }
