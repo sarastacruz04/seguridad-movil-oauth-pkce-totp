@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "UniSabana Seguridad",
+    "slug": "unisabana-seguridad-movil",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "unisabana-auth",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "co.edu.unisabana.seguridadmovil",
+      "infoPlist": {
+        "NSCameraUsageDescription": "La cámara se usa únicamente para escanear el código QR de tu semilla TOTP (otpauth://). No se toman ni guardan fotos."
+      }
+    },
+    "android": {
+      "package": "co.edu.unisabana.seguridadmovil",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B3D91",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "La cámara se usa únicamente para escanear el código QR de tu semilla TOTP (otpauth://). No se toman ni guardan fotos.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

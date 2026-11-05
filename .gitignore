@@ -1,0 +1,15 @@
+# Dependencias y builds
+node_modules/
+dist/
+.expo/
+web-build/
+
+# Variables de entorno (nunca se versionan; usar los .env.example)
+.env
+.env.*
+!.env.example
+
+# Varios
+*.log
+*.tsbuildinfo
+.DS_Store
