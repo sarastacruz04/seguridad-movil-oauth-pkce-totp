@@ -1,14 +1,16 @@
 {
   "name": "backend-auth",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend OAuth2+PKCE, JWT y Step-Up TOTP (laboratorio UniSabana)",
+  "main": "dist/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "SILENT_LOGS=1 node --import tsx --test tests/*.test.ts",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx scripts/smoke.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "express": "^5.3.0",
     "qrcode": "^1.5.4"
@@ -19,5 +21,9 @@
     "@types/qrcode": "^1.5.6",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
   }
 }
