@@ -28,11 +28,6 @@ export const totpAccountStore = {
     await totpAccountStorage.clear();
     state.set({ status: 'ready', account: null });
   },
-  /** Lectura sin suscripción (modal de step-up). */
-  current(): TotpAccount | null {
-    const value = state.get();
-    return value.status === 'ready' ? value.account : null;
-  },
 };
 
 export function useTotpAccount(): AccountState {

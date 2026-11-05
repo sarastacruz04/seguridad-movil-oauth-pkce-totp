@@ -5,7 +5,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, Tex
 import { verifyMfaCode } from '../api/endpoints';
 import { ApiError, describeError, NetworkError } from '../api/errors';
 import { logSecurityEvent } from '../api/securityLog';
-import { totpAccountStore } from '../authenticator/totpAccountStore';
+import { useTotpAccount } from '../authenticator/totpAccountStore';
 import { generateTotp } from '../lib/totp';
 import { monoFont, radius, spacing, useAppTheme } from '../theme/theme';
 import { AppButton } from './ui/AppButton';
@@ -44,10 +44,12 @@ function StepUpForm({ stepUpToken, onVerified, onCancel }: StepUpModalProps & { 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
-  const hasSeed = totpAccountStore.current() !== null;
+  // Suscripción (y carga desde SecureStore si aún no ocurrió: las pestañas se montan en diferido).
+  const accountState = useTotpAccount();
+  const account = accountState.status === 'ready' ? accountState.account : null;
+  const hasSeed = account !== null;
 
   const fillFromAuthenticator = async () => {
-    const account = totpAccountStore.current();
     if (!account) return;
     setCode(await generateTotp(account.secret, Date.now() / 1000)); // cálculo local, sin red
     setError(null);
