@@ -16,6 +16,7 @@ import type { TokenResponse } from '../api/responses';
 import { logSecurityEvent } from '../api/securityLog';
 import { refreshTokenStorage } from '../storage/secureStorage';
 import { resumeSignInFromUrl, signInWithSystemBrowser } from './oauthFlow';
+import { maskCallbackUrl, reportDiagnostic } from './startupDiagnostics';
 import { onSessionExpired } from './sessionEvents';
 import { tokenStore } from './tokenStore';
 
@@ -50,9 +51,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   /** Retoma un login interrumpido por un reinicio de la app (deep link con el intento en SecureStore). */
   const tryResumeSignIn = useCallback(
-    async (url: string | null): Promise<boolean> => {
+    async (url: string | null, origin: 'arranque' | 'evento'): Promise<boolean> => {
       try {
-        const tokens = await resumeSignInFromUrl(url);
+        const tokens = await resumeSignInFromUrl(url, origin);
         if (!tokens) return false;
         await acceptTokens(tokens);
         return true;
@@ -70,7 +71,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let cancelled = false;
     (async () => {
       // ¿La app se abrió con el enlace de retorno del login? (Expo Go en Android reinicia la app.)
-      if (await tryResumeSignIn(await Linking.getInitialURL().catch(() => null))) return;
+      const initialUrl = await Linking.getInitialURL().catch(() => null);
+      const linkingUrl = Linking.getLinkingURL();
+      reportDiagnostic(`Arranque de la app · getInitialURL=${maskCallbackUrl(initialUrl)} · getLinkingURL=${maskCallbackUrl(linkingUrl)}`);
+      if (await tryResumeSignIn(initialUrl ?? linkingUrl, 'arranque')) return;
+      if (linkingUrl && linkingUrl !== initialUrl && (await tryResumeSignIn(linkingUrl, 'arranque'))) return;
 
       const hasRefreshToken = (await refreshTokenStorage.get().catch(() => null)) !== null;
       if (!hasRefreshToken) {
@@ -100,7 +105,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // Enlace de retorno recibido con la app ya abierta pero sin un login en curso en memoria.
   useEffect(() => {
     const subscription = Linking.addEventListener('url', ({ url }) => {
-      void tryResumeSignIn(url);
+      void tryResumeSignIn(url, 'evento');
     });
     return () => subscription.remove();
   }, [tryResumeSignIn]);

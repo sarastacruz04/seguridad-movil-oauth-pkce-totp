@@ -27,6 +27,7 @@ import { buildAuthorizeUrl, isStateValid, parseCallbackUrl } from '../lib/oauth/
 import { resolveRedirectUri } from '../lib/oauth/redirectUri';
 import { createPkcePair, generateState } from '../lib/pkce';
 import { type PendingAuthorization, pendingAuthorizationStorage } from '../storage/secureStorage';
+import { maskCallbackUrl, reportDiagnostic } from './startupDiagnostics';
 
 /** Cuánto se espera el deep link si Android reporta "navegador cerrado" antes de que llegue. */
 const ANDROID_REDIRECT_GRACE_MS = 3000;
@@ -132,8 +133,14 @@ export async function signInWithSystemBrowser(): Promise<TokenResponse> {
   let callbackUrl: string | null;
   try {
     await pendingAuthorizationStorage.set(pending); // por si la app se reinicia con el navegador abierto
-    // preferEphemeralSession (iOS): sesión privada, sin cookies compartidas → pide credenciales cada vez.
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, { preferEphemeralSession: true });
+    reportDiagnostic('Login iniciado: intento guardado en SecureStore, abriendo el navegador');
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
+      // iOS: sesión privada, sin cookies compartidas → pide credenciales cada vez.
+      preferEphemeralSession: true,
+      // Android: el navegador se abre en la MISMA tarea que la app. Con la tarea aparte (valor por
+      // defecto en SDK 58), Expo Go trataba el retorno como una apertura nueva y reiniciaba la app.
+      createTask: false,
+    });
     callbackUrl = result.type === 'success' ? result.url : await redirectCapture.waitForUrl(ANDROID_REDIRECT_GRACE_MS);
     if (result.type !== 'success' && callbackUrl) {
       logSecurityEvent('info', 'Android: el navegador se reportó cerrado antes que el deep link; se recuperó el redirect');
@@ -142,15 +149,16 @@ export async function signInWithSystemBrowser(): Promise<TokenResponse> {
     throw new OAuthFlowError('provider_error', error instanceof Error ? error.message : undefined);
   } finally {
     redirectCapture.stop();
-    // El intento se consume aquí pase lo que pase: nunca se reutiliza para otro retorno.
     flowInProgress = false;
-    await pendingAuthorizationStorage.clear();
   }
 
   if (!callbackUrl) {
-    logSecurityEvent('warn', 'Login cancelado por el usuario (se cerró el navegador sin volver con un code)');
+    // No se borra el intento guardado: si la app se está reiniciando con el deep link, la nueva
+    // instancia lo necesita. Caduca solo (10 min) o lo reemplaza el siguiente intento.
+    logSecurityEvent('warn', 'Login cancelado o interrumpido (el navegador se cerró sin volver con un code)');
     throw new OAuthFlowError('cancelled');
   }
+  await pendingAuthorizationStorage.clear(); // un solo uso
   return completeAuthorization(callbackUrl, pending);
 }
 
@@ -159,17 +167,39 @@ export async function signInWithSystemBrowser(): Promise<TokenResponse> {
  * en Android, que reinicia la app al recibir el deep link. Se retoma con el intento guardado en
  * SecureStore, que se borra antes de usarlo (un solo uso). Devuelve null si no hay nada que retomar.
  */
-export async function resumeSignInFromUrl(url: string | null): Promise<TokenResponse | null> {
-  if (flowInProgress || !isOAuthCallbackUrl(url) || handledCallbackUrls.has(url)) return null;
-  handledCallbackUrls.add(url);
-
-  const pending = await pendingAuthorizationStorage.get().catch(() => null);
-  await pendingAuthorizationStorage.clear();
-  if (!pending) return null;
-  if (pending.expiresAtMs <= Date.now()) {
-    logSecurityEvent('warn', 'Retorno de login con un intento caducado: se descarta');
+export async function resumeSignInFromUrl(url: string | null, origin: 'arranque' | 'evento'): Promise<TokenResponse | null> {
+  reportDiagnostic(`Enlace (${origin}): ${maskCallbackUrl(url)}`);
+  if (flowInProgress) {
+    reportDiagnostic('→ hay un login en curso en memoria: lo maneja ese flujo');
     return null;
   }
+  if (!isOAuthCallbackUrl(url)) {
+    reportDiagnostic(`→ no es un retorno de login (se esperaba ${getRedirectUri()}?…state=…)`);
+    return null;
+  }
+  if (handledCallbackUrls.has(url)) {
+    reportDiagnostic('→ ese enlace ya se procesó');
+    return null;
+  }
+
+  const pending = await pendingAuthorizationStorage.get().catch(() => null);
+  if (!pending) {
+    reportDiagnostic('→ NO hay intento guardado en SecureStore');
+    return null;
+  }
+  if (pending.expiresAtMs <= Date.now()) {
+    await pendingAuthorizationStorage.clear();
+    reportDiagnostic('→ el intento guardado caducó');
+    return null;
+  }
+  if (!isStateValid(pending.state, parseCallbackUrl(url).state)) {
+    // Puede ser un enlace viejo (de otro intento): se ignora sin tocar el intento vigente.
+    reportDiagnostic('→ el state no corresponde al intento guardado: se ignora');
+    return null;
+  }
+  handledCallbackUrls.add(url);
+  await pendingAuthorizationStorage.clear(); // un solo uso
+  reportDiagnostic('→ state correcto: se retoma el login y se canjea el code');
   logSecurityEvent('info', 'La app se reinició durante el login: se retoma el intento guardado en SecureStore');
   return completeAuthorization(url, pending);
 }

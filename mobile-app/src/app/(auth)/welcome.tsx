@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { describeError, OAuthFlowError } from '@/api/errors';
 import { useAuth } from '@/auth/AuthProvider';
 import { getRedirectUri } from '@/auth/oauthFlow';
+import { DiagnosticsPanel } from '@/components/DiagnosticsPanel';
 import { AppButton } from '@/components/ui/AppButton';
 import { Banner } from '@/components/ui/Banner';
 import { API_URL, IS_API_CONFIGURED } from '@/config/env';
@@ -40,7 +41,7 @@ export default function WelcomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <View style={[styles.logo, { backgroundColor: colors.infoBg }]}>
           <Ionicons name="shield-half" size={44} color={colors.primary} />
         </View>
@@ -82,14 +83,23 @@ export default function WelcomeScreen() {
           <Text style={[styles.footnote, { color: colors.textMuted }]}>Servidor: {API_URL || 'sin configurar'}</Text>
           <Text style={[styles.footnote, { color: colors.textMuted }]}>Regreso (redirect_uri): {getRedirectUri()}</Text>
         </View>
-      </View>
+        <DiagnosticsPanel />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  container: { flex: 1, padding: spacing.xl, gap: spacing.lg, justifyContent: 'center', maxWidth: 520, width: '100%', alignSelf: 'center' },
+  container: {
+    flexGrow: 1,
+    padding: spacing.xl,
+    gap: spacing.lg,
+    justifyContent: 'center',
+    maxWidth: 520,
+    width: '100%',
+    alignSelf: 'center',
+  },
   logo: { width: 80, height: 80, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   kicker: { fontSize: 12, fontWeight: '700', letterSpacing: 0.8 },
   title: { fontSize: 30, fontWeight: '800', marginTop: -spacing.sm },
