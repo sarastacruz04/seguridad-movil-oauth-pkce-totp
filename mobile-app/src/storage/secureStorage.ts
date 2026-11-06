@@ -18,6 +18,7 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
 export const SECURE_KEYS = {
   refreshToken: 'unisabana.refresh_token',
   totpAccount: 'unisabana.totp_account',
+  pendingAuthorization: 'unisabana.pending_oauth',
 } as const;
 
 type SecureKey = (typeof SECURE_KEYS)[keyof typeof SECURE_KEYS];
@@ -71,4 +72,42 @@ export const totpAccountStorage = {
   },
   set: (account: TotpAccount) => write(SECURE_KEYS.totpAccount, JSON.stringify(account)),
   clear: () => remove(SECURE_KEYS.totpAccount),
+};
+
+/**
+ * Intento de login en curso (state + code_verifier). Vive aquí, cifrado, SOLO mientras el navegador
+ * está abierto, para sobrevivir a un reinicio de la app (Expo Go en Android reinicia la app al recibir
+ * el deep link; Android también puede matar el proceso). Caduca y se borra en cuanto se usa.
+ */
+export interface PendingAuthorization {
+  readonly state: string;
+  readonly codeVerifier: string;
+  readonly redirectUri: string;
+  readonly expiresAtMs: number;
+}
+
+function isPendingAuthorization(value: unknown): value is PendingAuthorization {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.state === 'string' &&
+    typeof record.codeVerifier === 'string' &&
+    typeof record.redirectUri === 'string' &&
+    typeof record.expiresAtMs === 'number'
+  );
+}
+
+export const pendingAuthorizationStorage = {
+  async get(): Promise<PendingAuthorization | null> {
+    const raw = await read(SECURE_KEYS.pendingAuthorization);
+    if (!raw) return null;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return isPendingAuthorization(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  },
+  set: (pending: PendingAuthorization) => write(SECURE_KEYS.pendingAuthorization, JSON.stringify(pending)),
+  clear: () => remove(SECURE_KEYS.pendingAuthorization).catch(() => undefined),
 };
