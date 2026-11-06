@@ -181,6 +181,7 @@ El código depende del **reloj del teléfono**: activa *Fecha y hora automática
 - **Inyección de dependencias en el núcleo** (hash, CSPRNG, almacenamiento): el mismo código corre en Node (tests con `node:crypto`) y en el teléfono (`expo-crypto`). Los self-tests del Laboratorio son exactamente los mismos que los de `npm test`.
 - **Pestañas JS (`expo-router/js-tabs`)** en lugar de `NativeTabs`: íconos y colores consistentes en ambas plataformas. Rutas protegidas con `Stack.Protected` (SDK 58).
 - **Ruta `/callback`**: en Android el router también recibe el deep link de OAuth; la ruta solo redirige a `/` (el code y el state los procesa `oauthFlow` desde el resultado de `openAuthSessionAsync`).
+- **`redirect_uri` calculado explícitamente** (`mobile-app/src/lib/oauth/redirectUri.ts`): en Expo Go SDK 58 sobre Android, `Linking.createURL('callback')` devolvió `unisabana-auth://callback`, un esquema que Expo Go no tiene registrado, y el navegador se quedaba en la página de login. Si la app detecta Expo Go (`expoVersion`, `appOwnership`, `expoGoConfig` o `linkingUri` con `exp://`), construye `exp://<host-de-Metro>/--/callback`; en un build propio usa `unisabana-auth://callback`. La Bienvenida y el Laboratorio muestran el valor efectivo.
 - **`preferEphemeralSession: true`** (iOS): sesión de navegador privada, así la demo pide credenciales cada vez.
 - **TypeScript 6.0** fijado en ambos proyectos (la plantilla de SDK 58 usa `~6.0.3`); `@types/node` 22 para coincidir con el runtime.
 - **ESLint (`eslint-config-expo`) + Prettier**; `expo lint` sin advertencias.

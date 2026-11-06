@@ -8,6 +8,7 @@
  *  4. Se valida el state ANTES de todo; si no coincide se aborta sin llamar a /token.
  *  5. Se canjea code + code_verifier por los tokens.
  */
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -18,14 +19,28 @@ import { logSecurityEvent } from '../api/securityLog';
 import { CLIENT_ID, OAUTH_CALLBACK_PATH } from '../config/constants';
 import { API_URL, IS_API_CONFIGURED } from '../config/env';
 import { buildAuthorizeUrl, isStateValid, parseCallbackUrl } from '../lib/oauth/authorizeRequest';
+import { resolveRedirectUri } from '../lib/oauth/redirectUri';
 import { createPkcePair, generateState } from '../lib/pkce';
 
 /** State del intento en curso. Solo en memoria y de UN SOLO USO. */
 let pendingState: string | null = null;
 
-/** redirect_uri efectivo: unisabana-auth://callback en un build; exp://<host>:<puerto>/--/callback en Expo Go. */
+/**
+ * redirect_uri efectivo: exp://<host>:<puerto>/--/callback en Expo Go; unisabana-auth://callback en un build.
+ * No se confía solo en Linking.createURL (ver lib/oauth/redirectUri.ts).
+ */
 export function getRedirectUri(): string {
-  return Linking.createURL(OAUTH_CALLBACK_PATH);
+  return resolveRedirectUri(
+    {
+      expoVersion: Constants.expoVersion ?? null,
+      appOwnership: Constants.appOwnership ?? null,
+      hasExpoGoConfig: Constants.expoGoConfig != null,
+      hostUri: Constants.expoConfig?.hostUri ?? null,
+      linkingUri: Constants.linkingUri ?? null,
+      createdUrl: Linking.createURL(OAUTH_CALLBACK_PATH),
+    },
+    OAUTH_CALLBACK_PATH,
+  );
 }
 
 export async function signInWithSystemBrowser(): Promise<TokenResponse> {

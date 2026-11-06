@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { describeError, OAuthFlowError } from '@/api/errors';
 import { useAuth } from '@/auth/AuthProvider';
+import { getRedirectUri } from '@/auth/oauthFlow';
 import { AppButton } from '@/components/ui/AppButton';
 import { Banner } from '@/components/ui/Banner';
 import { API_URL, IS_API_CONFIGURED } from '@/config/env';
@@ -79,6 +80,7 @@ export default function WelcomeScreen() {
             Se abrirá el navegador seguro del sistema. Tu contraseña nunca pasa por la app.
           </Text>
           <Text style={[styles.footnote, { color: colors.textMuted }]}>Servidor: {API_URL || 'sin configurar'}</Text>
+          <Text style={[styles.footnote, { color: colors.textMuted }]}>Regreso (redirect_uri): {getRedirectUri()}</Text>
         </View>
       </View>
     </SafeAreaView>
