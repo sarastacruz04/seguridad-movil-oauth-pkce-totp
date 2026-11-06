@@ -6,8 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { describeError, OAuthFlowError } from '@/api/errors';
 import { useAuth } from '@/auth/AuthProvider';
 import { getRedirectUri } from '@/auth/oauthFlow';
-import { reportDiagnostic } from '@/auth/startupDiagnostics';
-import { DiagnosticsPanel } from '@/components/DiagnosticsPanel';
 import { AppButton } from '@/components/ui/AppButton';
 import { Banner } from '@/components/ui/Banner';
 import { API_URL, IS_API_CONFIGURED } from '@/config/env';
@@ -35,7 +33,6 @@ export default function WelcomeScreen() {
     } catch (err) {
       // Cancelar no es un error grave: se muestra como aviso.
       const cancelled = err instanceof OAuthFlowError && err.kind === 'cancelled';
-      reportDiagnostic(`Aviso mostrado en la Bienvenida: ${describeError(err)}`);
       setError({ message: describeError(err), tone: cancelled ? 'warning' : 'danger' });
       setLoading(false);
     }
@@ -85,7 +82,6 @@ export default function WelcomeScreen() {
           <Text style={[styles.footnote, { color: colors.textMuted }]}>Servidor: {API_URL || 'sin configurar'}</Text>
           <Text style={[styles.footnote, { color: colors.textMuted }]}>Regreso (redirect_uri): {getRedirectUri()}</Text>
         </View>
-        <DiagnosticsPanel />
       </ScrollView>
     </SafeAreaView>
   );

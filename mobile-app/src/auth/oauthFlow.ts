@@ -1,17 +1,12 @@
 /**
  * Punto 1 — OAuth 2.0 Authorization Code + PKCE (RFC 7636) desde la app, sin librerías caja negra.
  *
- *  1. Genera code_verifier/code_challenge y un state aleatorio, únicos por intento.
+ *  1. Genera code_verifier/code_challenge y un state aleatorio (solo en memoria, únicos por intento).
  *  2. Abre el NAVEGADOR DEL SISTEMA (ASWebAuthenticationSession en iOS, Custom Tabs en Android) con
  *     WebBrowser.openAuthSessionAsync. Nada de WebView: la app nunca ve la contraseña.
  *  3. El proveedor redirige al deep link (unisabana-auth://callback o exp://…/--/callback).
  *  4. Se valida el state ANTES de todo; si no coincide se aborta sin llamar a /token.
  *  5. Se canjea code + code_verifier por los tokens.
- *
- * El intento en curso (state + verifier) vive en memoria y, mientras el navegador está abierto, también
- * cifrado en SecureStore: en Android (Expo Go, o si el sistema mata el proceso) la app puede REINICIARSE
- * al recibir el deep link y perdería la memoria. Al arrancar con el enlace de retorno se retoma el login
- * (resumeSignInFromUrl). El intento caduca y es de un solo uso.
  */
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
@@ -26,24 +21,18 @@ import { API_URL, IS_API_CONFIGURED } from '../config/env';
 import { buildAuthorizeUrl, isStateValid, parseCallbackUrl } from '../lib/oauth/authorizeRequest';
 import { resolveRedirectUri } from '../lib/oauth/redirectUri';
 import { createPkcePair, generateState } from '../lib/pkce';
-import { type PendingAuthorization, pendingAuthorizationStorage } from '../storage/secureStorage';
-import { maskCallbackUrl, reportDiagnostic } from './startupDiagnostics';
+
+/** State del intento en curso. Solo en memoria y de UN SOLO USO. */
+let pendingState: string | null = null;
 
 /** Cuánto se espera el deep link si Android reporta "navegador cerrado" antes de que llegue. */
 const ANDROID_REDIRECT_GRACE_MS = 3000;
-/** Vida máxima de un intento de login guardado (el code del servidor dura 60 s). */
-const PENDING_TTL_MS = 10 * 60 * 1000;
-
-/** true mientras el navegador del login está abierto (lo maneja signInWithSystemBrowser). */
-let flowInProgress = false;
-/** Enlaces de retorno ya procesados: un mismo deep link nunca se canjea dos veces. */
-const handledCallbackUrls = new Set<string>();
 
 /**
- * En Android, openAuthSessionAsync compite entre "la app volvió a primer plano" (→ dismiss) y
- * "llegó el deep link" (→ success), y gana el primero. A veces gana el dismiss aunque el deep link
- * con el code esté llegando. Por eso se escucha el deep link desde que se abre el navegador y, si
- * hace falta, se espera un poco. El state se valida igual después.
+ * En Android, openAuthSessionAsync hace Promise.race entre "la app volvió a primer plano" (→ dismiss)
+ * y "llegó el deep link" (→ success). Si gana el dismiss, el code que viene en camino se perdería.
+ * Por eso se escucha el deep link desde que se abre el navegador y, si hace falta, se espera un poco.
+ * El state se valida igual después.
  */
 function captureRedirect(redirectUri: string): { waitForUrl(timeoutMs: number): Promise<string | null>; stop(): void } {
   let captured: string | null = null;
@@ -86,16 +75,50 @@ export function getRedirectUri(): string {
   );
 }
 
-/** ¿Es este enlace un retorno de OAuth (redirect_uri con state)? */
-export function isOAuthCallbackUrl(url: string | null): url is string {
-  return url !== null && url.startsWith(getRedirectUri()) && parseCallbackUrl(url).state !== null;
-}
+export async function signInWithSystemBrowser(): Promise<TokenResponse> {
+  if (!IS_API_CONFIGURED) throw new OAuthFlowError('not_configured');
 
-/** Validación anti-CSRF del retorno + canje del code con el verifier del MISMO intento. */
-async function completeAuthorization(callbackUrl: string, pending: PendingAuthorization): Promise<TokenResponse> {
-  handledCallbackUrls.add(callbackUrl);
+  const redirectUri = getRedirectUri();
+  const { codeVerifier, codeChallenge } = await createPkcePair();
+  const state = await generateState();
+  pendingState = state;
+  logSecurityEvent('info', `PKCE generado (challenge ${codeChallenge.slice(0, 6)}…) · state ${state.slice(0, 6)}…`);
+
+  const authUrl = buildAuthorizeUrl({ apiUrl: API_URL, clientId: CLIENT_ID, redirectUri, codeChallenge, state });
+  const redirectCapture = captureRedirect(redirectUri);
+  let callbackUrl: string | null;
+  try {
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
+      // iOS: sesión privada, sin cookies compartidas → pide credenciales cada vez.
+      preferEphemeralSession: true,
+      // Android: sin la actividad "proxy" de SDK 58. Con el proxy, la pestaña del login anterior
+      // quedaba viva en otra tarea y Android la reutilizaba en el siguiente login, sin cargar la URL
+      // nueva: volvía con el state VIEJO y la app abortaba (anti-CSRF). Sin proxy, la Custom Tab se
+      // abre sin historial (FLAG_ACTIVITY_NO_HISTORY) y cada login carga la página nueva.
+      useProxyActivity: false,
+    });
+    callbackUrl = result.type === 'success' ? result.url : await redirectCapture.waitForUrl(ANDROID_REDIRECT_GRACE_MS);
+    if (result.type !== 'success' && callbackUrl) {
+      logSecurityEvent('info', 'Android: el navegador se reportó cerrado antes que el deep link; se recuperó el redirect');
+    }
+  } catch (error) {
+    pendingState = null;
+    throw new OAuthFlowError('provider_error', error instanceof Error ? error.message : undefined);
+  } finally {
+    redirectCapture.stop();
+  }
+
+  // El state se consume aquí pase lo que pase: nunca se reutiliza para otro retorno.
+  const expectedState = pendingState;
+  pendingState = null;
+
+  if (!callbackUrl) {
+    logSecurityEvent('warn', 'Login cancelado por el usuario (se cerró el navegador sin volver con un code)');
+    throw new OAuthFlowError('cancelled');
+  }
+
   const callback = parseCallbackUrl(callbackUrl);
-  if (!isStateValid(pending.state, callback.state)) {
+  if (!isStateValid(expectedState, callback.state)) {
     logSecurityEvent('error', 'state del deep link NO coincide → intercambio abortado (anti-CSRF)');
     throw new OAuthFlowError('state_mismatch');
   }
@@ -106,105 +129,10 @@ async function completeAuthorization(callbackUrl: string, pending: PendingAuthor
 
   logSecurityEvent('success', 'Deep link recibido · state verificado · canjeando code + code_verifier');
   try {
-    const tokens = await exchangeAuthorizationCode({
-      code: callback.code,
-      codeVerifier: pending.codeVerifier,
-      redirectUri: pending.redirectUri,
-    });
+    const tokens = await exchangeAuthorizationCode({ code: callback.code, codeVerifier, redirectUri });
     logSecurityEvent('success', `Tokens recibidos · access ${tokens.accessToken.slice(0, 6)}… (RAM) · refresh → SecureStore`);
     return tokens;
   } catch (error) {
     throw new OAuthFlowError('exchange_failed', describeError(error));
   }
-}
-
-export async function signInWithSystemBrowser(): Promise<TokenResponse> {
-  if (!IS_API_CONFIGURED) throw new OAuthFlowError('not_configured');
-
-  const redirectUri = getRedirectUri();
-  const { codeVerifier, codeChallenge } = await createPkcePair();
-  const state = await generateState();
-  const pending: PendingAuthorization = { state, codeVerifier, redirectUri, expiresAtMs: Date.now() + PENDING_TTL_MS };
-  logSecurityEvent('info', `PKCE generado (challenge ${codeChallenge.slice(0, 6)}…) · state ${state.slice(0, 6)}…`);
-
-  const authUrl = buildAuthorizeUrl({ apiUrl: API_URL, clientId: CLIENT_ID, redirectUri, codeChallenge, state });
-  flowInProgress = true;
-  const redirectCapture = captureRedirect(redirectUri);
-  let callbackUrl: string | null;
-  try {
-    await pendingAuthorizationStorage.set(pending); // por si la app se reinicia con el navegador abierto
-    reportDiagnostic('Login iniciado: intento guardado en SecureStore, abriendo el navegador');
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
-      // iOS: sesión privada, sin cookies compartidas → pide credenciales cada vez.
-      preferEphemeralSession: true,
-      // Android: sin la actividad "proxy" de SDK 58. Con el proxy, la pestaña del login anterior
-      // quedaba viva en otra tarea y Android la reutilizaba en el siguiente login, sin cargar la URL
-      // nueva: volvía con el state VIEJO y la app abortaba (anti-CSRF). Sin proxy, la Custom Tab se
-      // abre sin historial (FLAG_ACTIVITY_NO_HISTORY) y cada login carga la página nueva.
-      useProxyActivity: false,
-    });
-    reportDiagnostic(`openAuthSessionAsync terminó con "${result.type}"`);
-    callbackUrl = result.type === 'success' ? result.url : await redirectCapture.waitForUrl(ANDROID_REDIRECT_GRACE_MS);
-    reportDiagnostic(`Enlace de retorno en este flujo: ${maskCallbackUrl(callbackUrl)}`);
-    if (result.type !== 'success' && callbackUrl) {
-      logSecurityEvent('info', 'Android: el navegador se reportó cerrado antes que el deep link; se recuperó el redirect');
-    }
-  } catch (error) {
-    reportDiagnostic(`openAuthSessionAsync lanzó un error: ${error instanceof Error ? error.message : String(error)}`);
-    throw new OAuthFlowError('provider_error', error instanceof Error ? error.message : undefined);
-  } finally {
-    redirectCapture.stop();
-    flowInProgress = false;
-  }
-
-  if (!callbackUrl) {
-    // No se borra el intento guardado: si la app se está reiniciando con el deep link, la nueva
-    // instancia lo necesita. Caduca solo (10 min) o lo reemplaza el siguiente intento.
-    logSecurityEvent('warn', 'Login cancelado o interrumpido (el navegador se cerró sin volver con un code)');
-    throw new OAuthFlowError('cancelled');
-  }
-  await pendingAuthorizationStorage.clear(); // un solo uso
-  return completeAuthorization(callbackUrl, pending);
-}
-
-/**
- * La app se abrió (o reabrió) con el enlace de retorno pero sin el intento en memoria: típico de Expo Go
- * en Android, que reinicia la app al recibir el deep link. Se retoma con el intento guardado en
- * SecureStore, que se borra antes de usarlo (un solo uso). Devuelve null si no hay nada que retomar.
- */
-export async function resumeSignInFromUrl(url: string | null, origin: 'arranque' | 'evento'): Promise<TokenResponse | null> {
-  reportDiagnostic(`Enlace (${origin}): ${maskCallbackUrl(url)}`);
-  if (flowInProgress) {
-    reportDiagnostic('→ hay un login en curso en memoria: lo maneja ese flujo');
-    return null;
-  }
-  if (!isOAuthCallbackUrl(url)) {
-    reportDiagnostic(`→ no es un retorno de login (se esperaba ${getRedirectUri()}?…state=…)`);
-    return null;
-  }
-  if (handledCallbackUrls.has(url)) {
-    reportDiagnostic('→ ese enlace ya se procesó');
-    return null;
-  }
-
-  const pending = await pendingAuthorizationStorage.get().catch(() => null);
-  if (!pending) {
-    reportDiagnostic('→ NO hay intento guardado en SecureStore');
-    return null;
-  }
-  if (pending.expiresAtMs <= Date.now()) {
-    await pendingAuthorizationStorage.clear();
-    reportDiagnostic('→ el intento guardado caducó');
-    return null;
-  }
-  if (!isStateValid(pending.state, parseCallbackUrl(url).state)) {
-    // Puede ser un enlace viejo (de otro intento): se ignora sin tocar el intento vigente.
-    reportDiagnostic('→ el state no corresponde al intento guardado: se ignora');
-    return null;
-  }
-  handledCallbackUrls.add(url);
-  await pendingAuthorizationStorage.clear(); // un solo uso
-  reportDiagnostic('→ state correcto: se retoma el login y se canjea el code');
-  logSecurityEvent('info', 'La app se reinició durante el login: se retoma el intento guardado en SecureStore');
-  return completeAuthorization(url, pending);
 }

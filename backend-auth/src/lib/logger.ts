@@ -3,7 +3,7 @@ export function mask(secret: string): string {
   return secret.length <= 6 ? '******' : `${secret.slice(0, 6)}…`;
 }
 
-export type LogTag = 'OAUTH' | 'PKCE' | 'TOKEN' | 'REFRESH' | 'LOGOUT' | 'API' | 'BOVEDA' | 'MFA' | 'ENROLL' | 'SERVER' | 'APP';
+export type LogTag = 'OAUTH' | 'PKCE' | 'TOKEN' | 'REFRESH' | 'LOGOUT' | 'API' | 'BOVEDA' | 'MFA' | 'ENROLL' | 'SERVER';
 
 export function log(tag: LogTag, message: string): void {
   if (process.env.SILENT_LOGS === '1') return; // los tests lo activan para no ensuciar la salida
