@@ -134,18 +134,16 @@ export async function signInWithSystemBrowser(): Promise<TokenResponse> {
   try {
     await pendingAuthorizationStorage.set(pending); // por si la app se reinicia con el navegador abierto
     reportDiagnostic('Login iniciado: intento guardado en SecureStore, abriendo el navegador');
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
-      // iOS: sesión privada, sin cookies compartidas → pide credenciales cada vez.
-      preferEphemeralSession: true,
-      // Android: el navegador se abre en la MISMA tarea que la app. Con la tarea aparte (valor por
-      // defecto en SDK 58), Expo Go trataba el retorno como una apertura nueva y reiniciaba la app.
-      createTask: false,
-    });
+    // preferEphemeralSession (iOS): sesión privada, sin cookies compartidas → pide credenciales cada vez.
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, { preferEphemeralSession: true });
+    reportDiagnostic(`openAuthSessionAsync terminó con "${result.type}"`);
     callbackUrl = result.type === 'success' ? result.url : await redirectCapture.waitForUrl(ANDROID_REDIRECT_GRACE_MS);
+    reportDiagnostic(`Enlace de retorno en este flujo: ${maskCallbackUrl(callbackUrl)}`);
     if (result.type !== 'success' && callbackUrl) {
       logSecurityEvent('info', 'Android: el navegador se reportó cerrado antes que el deep link; se recuperó el redirect');
     }
   } catch (error) {
+    reportDiagnostic(`openAuthSessionAsync lanzó un error: ${error instanceof Error ? error.message : String(error)}`);
     throw new OAuthFlowError('provider_error', error instanceof Error ? error.message : undefined);
   } finally {
     redirectCapture.stop();
