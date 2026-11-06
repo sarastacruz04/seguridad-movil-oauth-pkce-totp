@@ -134,8 +134,15 @@ export async function signInWithSystemBrowser(): Promise<TokenResponse> {
   try {
     await pendingAuthorizationStorage.set(pending); // por si la app se reinicia con el navegador abierto
     reportDiagnostic('Login iniciado: intento guardado en SecureStore, abriendo el navegador');
-    // preferEphemeralSession (iOS): sesión privada, sin cookies compartidas → pide credenciales cada vez.
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, { preferEphemeralSession: true });
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
+      // iOS: sesión privada, sin cookies compartidas → pide credenciales cada vez.
+      preferEphemeralSession: true,
+      // Android: sin la actividad "proxy" de SDK 58. Con el proxy, la pestaña del login anterior
+      // quedaba viva en otra tarea y Android la reutilizaba en el siguiente login, sin cargar la URL
+      // nueva: volvía con el state VIEJO y la app abortaba (anti-CSRF). Sin proxy, la Custom Tab se
+      // abre sin historial (FLAG_ACTIVITY_NO_HISTORY) y cada login carga la página nueva.
+      useProxyActivity: false,
+    });
     reportDiagnostic(`openAuthSessionAsync terminó con "${result.type}"`);
     callbackUrl = result.type === 'success' ? result.url : await redirectCapture.waitForUrl(ANDROID_REDIRECT_GRACE_MS);
     reportDiagnostic(`Enlace de retorno en este flujo: ${maskCallbackUrl(callbackUrl)}`);
