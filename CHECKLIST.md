@@ -39,7 +39,7 @@ Rutas: `M/` = `mobile-app/src/`, `B/` = `backend-auth/src/`. Verificación: **T-
 | 401 → pausar/encolar, UN solo `POST /auth/refresh`, reintentar y desbloquear | ✅ 📱 | `refreshAccessToken` (promesa compartida), interceptores de request y response | T-M "5 peticiones concurrentes… UN solo POST /auth/refresh", "peticiones lanzadas DURANTE el refresh se pausan"; en el teléfono: 1 refresh, 4 en cola, 5 "Reintento OK" |
 | Refresh vencido/revocado → limpiar SecureStore y navegar a Bienvenida | ✅ 📱 | `performRefresh` · `expireSession`; `M/auth/sessionEvents.ts`; `AuthProvider` + `Stack.Protected` en `M/app/_layout.tsx` | T-M "refresh revocado → SessionExpiredError…"; botón "Simular refresh_token revocado" en el teléfono |
 | Sin red no cierra sesión | ✅ | `performRefresh` (`NetworkError`) | T-M "sin red → NetworkError y el refresh_token se CONSERVA" |
-| Arranque en frío con silent refresh tras el splash | ✅ ⏳ | `AuthProvider` (efecto inicial), `SplashScreen.preventAutoHideAsync` | Revisión de código; ⏳ prueba opcional: con sesión iniciada, cerrar Expo Go del todo y volver a abrir → debe entrar sin pedir login |
+| Arranque en frío con silent refresh tras el splash | ✅ 📱 | `AuthProvider` (efecto inicial), `SplashScreen.preventAutoHideAsync` | En el teléfono: con sesión iniciada, se cerró Expo Go del todo y al volver a abrir entró sin pedir login |
 | Laboratorio: invalidar token, 5 concurrentes, log, estado enmascarado, redirectUri, self-tests | ✅ 📱 | `M/app/(app)/(tabs)/laboratorio.tsx`, `M/components/SecurityLogList.tsx`, `M/components/SelfTestPanel.tsx` | Usado en el teléfono |
 
 ## Punto 3 — Authenticator TOTP propio
@@ -112,4 +112,4 @@ npm test && npm run typecheck && npm run lint
 npx expo start                        # WSL en NAT: ver README §2 (mirrored o portproxy)
 ```
 
-**Pendiente:** subir el repositorio a GitHub; grabar el video opcional; y, si quieres, la prueba opcional de arranque en frío (con sesión iniciada, cerrar Expo Go del todo y volver a abrir: debe entrar sin pedir login).
+**Pendiente:** subir el repositorio a GitHub y grabar el video opcional.
